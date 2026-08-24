@@ -18,7 +18,19 @@ func newOpsAPIHandler(service *OpsService, gate opsGate) *opsAPIHandler {
 }
 
 func opsStatusForError(err error) int {
-	return http.StatusInternalServerError
+	if err == nil {
+		return http.StatusOK
+	}
+	switch {
+	case opsIsNotFound(err):
+		return http.StatusNotFound
+	case opsIsConflict(err):
+		return http.StatusConflict
+	case opsIsInvalid(err) || opsIsTransition(err) || opsIsPolicy(err):
+		return http.StatusBadRequest
+	default:
+		return http.StatusInternalServerError
+	}
 }
 
 func (h *opsAPIHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
