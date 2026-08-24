@@ -1,0 +1,7 @@
+.DS_Store
+*.log
+.env
+backend/*-service
+backend/bin/
+*.test
+*.out
