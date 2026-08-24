@@ -1,7 +1,10 @@
 package main
 
 import (
+	"context"
 	"encoding/json"
+	"errors"
+	"log"
 	"net/http"
 	"strings"
 )
@@ -94,7 +97,26 @@ func promoteHandler(batch *SampleBatcher) http.HandlerFunc {
 			writeError(w, http.StatusBadRequest, "from status is required")
 			return
 		}
-		result, _ := batch.Promote(r.Context(), req.From, req.To)
+		result, err := batch.Promote(r.Context(), req.From, req.To)
+		if err != nil {
+			// 批量推进可能在中途失败或被取消，但已落库的样品不会回滚：
+			// 既要记日志、返回非 200，也要把已经推进的 result 带回去，方便排查。
+			requestID := w.Header().Get("X-Request-ID")
+			log.Printf("batch promote failed request_id=%s from=%s to=%s promoted=%d failed=%d err=%v",
+				requestID, req.From, req.To, result.Promoted, result.Failed, err)
+			status := http.StatusInternalServerError
+			switch {
+			case errors.Is(err, context.Canceled), errors.Is(err, context.DeadlineExceeded):
+				status = 499
+			case errors.Is(err, ErrBatchInvalidTransition):
+				status = http.StatusBadRequest
+			}
+			writeJSON(w, status, map[string]any{
+				"error":  err.Error(),
+				"result": result,
+			})
+			return
+		}
 		writeJSON(w, http.StatusOK, result)
 	}
 }
