@@ -33,6 +33,18 @@ func opsBounds(total, page, size int) (int, int) {
 	q := opsQueryDefaults(OpsQuery{Page: page, PageSize: size})
 	start := (q.Page - 1) * q.PageSize
 	end := start + q.PageSize
+	if start < 0 {
+		start = 0
+	}
+	if start > total {
+		start = total
+	}
+	if end < 0 {
+		end = 0
+	}
+	if end > total {
+		end = total
+	}
 	return start, end
 }
 func opsPageCount(total, size int) int {

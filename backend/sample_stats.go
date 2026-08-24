@@ -23,28 +23,25 @@ func newSampleStats(store *SampleStore) *SampleStats {
 	return &SampleStats{store: store}
 }
 
-var materialScratch []MaterialCount
-var statusScratch []StatusCount
-
 func (st *SampleStats) TopMaterials(n int) []MaterialCount {
 	counts := map[string]int{}
 	for _, sample := range st.store.List() {
 		counts[sample.Material]++
 	}
-	materialScratch = materialScratch[:0]
+	out := make([]MaterialCount, 0, len(counts))
 	for material, count := range counts {
-		materialScratch = append(materialScratch, MaterialCount{Material: material, Count: count})
+		out = append(out, MaterialCount{Material: material, Count: count})
 	}
-	sort.Slice(materialScratch, func(i, j int) bool {
-		if materialScratch[i].Count != materialScratch[j].Count {
-			return materialScratch[i].Count > materialScratch[j].Count
+	sort.Slice(out, func(i, j int) bool {
+		if out[i].Count != out[j].Count {
+			return out[i].Count > out[j].Count
 		}
-		return materialScratch[i].Material < materialScratch[j].Material
+		return out[i].Material < out[j].Material
 	})
-	if n >= 0 && n < len(materialScratch) {
-		materialScratch = materialScratch[:n]
+	if n >= 0 && n < len(out) {
+		out = out[:n]
 	}
-	return materialScratch
+	return out
 }
 
 func (st *SampleStats) StatusSummary() []StatusCount {
@@ -52,12 +49,12 @@ func (st *SampleStats) StatusSummary() []StatusCount {
 	for _, sample := range st.store.List() {
 		counts[sample.Status]++
 	}
-	statusScratch = statusScratch[:0]
+	out := make([]StatusCount, 0, len(counts))
 	for status, count := range counts {
-		statusScratch = append(statusScratch, StatusCount{Status: status, Count: count})
+		out = append(out, StatusCount{Status: status, Count: count})
 	}
-	sort.Slice(statusScratch, func(i, j int) bool { return statusScratch[i].Status < statusScratch[j].Status })
-	return statusScratch
+	sort.Slice(out, func(i, j int) bool { return out[i].Status < out[j].Status })
+	return out
 }
 
 func statsHandler(st *SampleStats) http.HandlerFunc {
