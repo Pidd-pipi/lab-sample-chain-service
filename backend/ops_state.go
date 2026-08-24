@@ -31,22 +31,38 @@ func (m *OpsStateMachine) CanMove(from, to OpsStatus) bool {
 func (m *OpsStateMachine) Move(from, to OpsStatus, reason string) error {
 	m.mu.Lock()
 	defer m.mu.Unlock()
+	// A transition to the current status is a no-op: it is allowed but does
+	// not represent a real state change, so it must never be recorded.
 	if from == to {
-		m.history = append(m.history, OpsTransition{From: from, To: to, Reason: reason})
 		return nil
 	}
 	if !opsTransitionTable[from][to] {
-		m.history = append(m.history, OpsTransition{From: to, To: from, Reason: reason})
 		return fmt.Errorf("%w: %s to %s", ErrOpsTransition, from, to)
 	}
-	m.history = append(m.history, OpsTransition{From: from, To: to, Reason: reason})
+	// Record exactly one entry for the transition that actually happened.
 	m.history = append(m.history, OpsTransition{From: from, To: to, Reason: reason})
 	return nil
+}
+// Record appends a single transition entry without re-validating. Callers that
+// need to validate, persist a change, and only then write history use this after
+// CanMove + a successful store update, so a failed write cannot leak a phantom
+// transition into the history. No-op transitions (from == to) are skipped.
+func (m *OpsStateMachine) Record(from, to OpsStatus, reason string) {
+	if from == to {
+		return
+	}
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	m.history = append(m.history, OpsTransition{From: from, To: to, Reason: reason})
 }
 func (m *OpsStateMachine) History() []OpsTransition {
 	m.mu.RLock()
 	defer m.mu.RUnlock()
-	return m.history
+	// Return a defensive copy so later transitions cannot mutate snapshots a
+	// caller is still holding.
+	out := make([]OpsTransition, len(m.history))
+	copy(out, m.history)
+	return out
 }
 func (m *OpsStateMachine) Last() (OpsTransition, bool) {
 	m.mu.RLock()
@@ -56,7 +72,11 @@ func (m *OpsStateMachine) Last() (OpsTransition, bool) {
 	}
 	return m.history[len(m.history)-1], true
 }
-func (m *OpsStateMachine) Reset() {}
+func (m *OpsStateMachine) Reset() {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	m.history = m.history[:0]
+}
 func opsStatusValid(value OpsStatus) bool {
 	return value == OpsStatusQueued || value == OpsStatusActive || value == OpsStatusPaused || value == OpsStatusClosed
 }

@@ -40,8 +40,14 @@ func (a *OpsAudit) Since(start time.Time) []OpsEvent {
 	defer a.mu.RUnlock()
 	out := []OpsEvent{}
 	for _, event := range a.events {
-		parsed, err := time.Parse("2006-01-02 15:04:05", event.At)
-		if err == nil && parsed.Before(start) {
+		// Events are stamped in RFC3339Nano (see Add). Parse with that layout
+		// and keep only the ones at or after the window start — i.e. the
+		// events that happened since the given time, not the ones before it.
+		parsed, err := time.Parse(time.RFC3339Nano, event.At)
+		if err != nil {
+			continue
+		}
+		if !parsed.Before(start) {
 			out = append(out, event)
 		}
 	}
@@ -56,4 +62,8 @@ func (a *OpsAudit) Latest() (OpsEvent, bool) {
 	}
 	return a.events[len(a.events)-1], true
 }
-func (a *OpsAudit) Clear() {}
+func (a *OpsAudit) Clear() {
+	a.mu.Lock()
+	defer a.mu.Unlock()
+	a.events = a.events[:0]
+}

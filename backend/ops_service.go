@@ -77,13 +77,18 @@ func (s *OpsService) Transition(ctx context.Context, id string, expected int, ta
 	if expected > 0 && expected != record.Revision {
 		return OpsRecord{}, ErrOpsConflict
 	}
-	if err := s.state.Move(record.Status, target, "operator update"); err != nil {
-		return OpsRecord{}, err
+	// Validate the transition without recording it. The history entry is
+	// appended only after the store confirms the update, so a failed or
+	// conflicting write cannot leave a phantom transition that never happened.
+	if !s.state.CanMove(record.Status, target) {
+		return OpsRecord{}, fmt.Errorf("%w: %s to %s", ErrOpsTransition, record.Status, target)
 	}
+	from := record.Status
 	record.Status = target
 	if err := s.store.Update(ctx, record, expected); err != nil {
 		return OpsRecord{}, err
 	}
+	s.state.Record(from, target, "operator update")
 	s.audit.Add(record.ID, "status_changed", actor)
 	return record, nil
 }
