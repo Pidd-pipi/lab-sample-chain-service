@@ -1,0 +1,1 @@
+{"mode":"service","workdir":"backend","start":"go run .","env":{"PORT":"18080"},"ready_url":"http://127.0.0.1:18080/healthz"}
