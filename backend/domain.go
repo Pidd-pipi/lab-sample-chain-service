@@ -8,7 +8,7 @@ type Sample struct {
 }
 
 var sampleTransitions = map[string]map[string]bool{
-	"received":  {"in_review": true, "rejected": true, "released": true},
+	"received":  {"in_review": true, "rejected": true},
 	"in_review": {"released": true, "rejected": true},
 	"released":  {},
 	"rejected":  {},

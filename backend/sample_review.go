@@ -73,7 +73,7 @@ func (rs *ReviewStore) PendingReviews() []SampleReview {
 	defer rs.mu.RUnlock()
 	out := make([]SampleReview, 0)
 	for _, review := range rs.reviews {
-		if review.Status == ReviewPending {
+		if review.Status == ReviewPending || review.Status == ReviewInProgress {
 			out = append(out, review)
 		}
 	}
@@ -89,6 +89,12 @@ func (rs *ReviewStore) Submit(sampleID, reviewer, comment string, store *SampleS
 	}
 	if !reviewTransitions[review.Status][ReviewInProgress] {
 		return SampleReview{}, ErrReviewTransition
+	}
+	// Push the sample into the review pipeline so its status tracks the review.
+	if store != nil {
+		if _, exists, changed := store.UpdateStatus(sampleID, "in_review"); !exists || !changed {
+			return SampleReview{}, ErrReviewTransition
+		}
 	}
 	review.Status = ReviewInProgress
 	review.Reviewer = reviewer
@@ -112,11 +118,20 @@ func (rs *ReviewStore) Decide(sampleID string, approve bool, reviewer, comment s
 	if !reviewTransitions[review.Status][target] {
 		return SampleReview{}, ErrReviewTransition
 	}
+	// Carry the decision over to the sample so its status tracks the review outcome.
+	if store != nil {
+		sampleStatus := "rejected"
+		if approve {
+			sampleStatus = "released"
+		}
+		if _, exists, changed := store.UpdateStatus(sampleID, sampleStatus); !exists || !changed {
+			return SampleReview{}, ErrReviewTransition
+		}
+	}
+	review.Status = target
 	review.Reviewer = reviewer
 	review.Comment = comment
 	review.UpdatedAt = time.Now().UTC().Format(time.RFC3339Nano)
-	rs.reviews[sampleID] = review
-	review.Status = ReviewInProgress
 	rs.reviews[sampleID] = review
 	return review, nil
 }
