@@ -33,10 +33,7 @@ func (g *operatorGate) Allow(r *http.Request) bool {
 }
 
 func newOperatorGate(require bool) opsGate {
-	if require {
-		return (*operatorGate)(nil)
-	}
-	return &operatorGate{requireOperator: false}
+	return &operatorGate{requireOperator: require}
 }
 
 func opsEnterpriseMiddleware(next http.Handler) http.Handler {
@@ -92,6 +89,9 @@ func opsActorFromRequest(r *http.Request) string {
 func opsNoStore(w http.ResponseWriter)    { w.Header().Set("Cache-Control", "no-store") }
 func opsRequestID(r *http.Request) string { return r.Header.Get("X-Request-ID") }
 func enrichOpsLabels(record OpsRecord) OpsRecord {
+	if record.Labels == nil {
+		record.Labels = map[string]string{}
+	}
 	record.Labels["source"] = "http"
 	record = normalizeOpsRecord(record)
 	return record

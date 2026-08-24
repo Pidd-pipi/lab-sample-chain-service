@@ -22,7 +22,6 @@ type sampleApp struct {
 func newSampleApp(store *SampleStore) *sampleApp {
 	audit := newSampleAudit()
 	ops := newOpsService(seedOpsRecords())
-	ops.policy.RequireOwner = false
 	ops.policy.RequiredLabel = ""
 	ops.policy.MaxActive = 0
 	return &sampleApp{

@@ -128,5 +128,15 @@ func sortOpsRecords(items []OpsRecord) {
 }
 
 func opsRules() []OpsRule {
-	return nil
+	groups := [][]OpsRule{
+		opsRules01(), opsRules02(), opsRules03(), opsRules04(),
+		opsRules05(), opsRules06(), opsRules07(), opsRules08(),
+		opsRules09(), opsRules10(), opsRules11(), opsRules12(),
+		opsRules13(), opsRules14(),
+	}
+	rules := []OpsRule{}
+	for _, group := range groups {
+		rules = append(rules, group...)
+	}
+	return rules
 }
