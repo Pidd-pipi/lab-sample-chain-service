@@ -28,6 +28,8 @@ func newSampleAudit() *SampleAudit {
 }
 
 func (a *SampleAudit) Add(sampleID, action, actor, note string) SampleAuditEvent {
+	a.mu.Lock()
+	defer a.mu.Unlock()
 	a.next++
 	event := SampleAuditEvent{
 		ID:       fmt.Sprintf("sa-%06d", a.next),
@@ -38,10 +40,17 @@ func (a *SampleAudit) Add(sampleID, action, actor, note string) SampleAuditEvent
 		Note:     note,
 	}
 	a.events = append(a.events, event)
+	// Bound the audit log so a long-running service does not grow memory
+	// without limit. Keep the most recent sampleAuditCap events.
+	if len(a.events) > sampleAuditCap {
+		a.events = append(a.events[:0:0], a.events[len(a.events)-sampleAuditCap:]...)
+	}
 	return event
 }
 
 func (a *SampleAudit) For(sampleID string) []SampleAuditEvent {
+	a.mu.RLock()
+	defer a.mu.RUnlock()
 	out := make([]SampleAuditEvent, 0)
 	for _, event := range a.events {
 		if event.SampleID == sampleID {
@@ -52,13 +61,17 @@ func (a *SampleAudit) For(sampleID string) []SampleAuditEvent {
 }
 
 func (a *SampleAudit) Recent(limit int) []SampleAuditEvent {
+	a.mu.RLock()
+	defer a.mu.RUnlock()
 	if limit < 1 {
 		limit = 20
 	}
 	if limit > len(a.events) {
 		limit = len(a.events)
 	}
-	return a.events[len(a.events)-limit:]
+	out := make([]SampleAuditEvent, limit)
+	copy(out, a.events[len(a.events)-limit:])
+	return out
 }
 
 func (a *SampleAudit) Count() int {

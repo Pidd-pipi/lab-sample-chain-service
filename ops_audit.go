@@ -9,6 +9,10 @@ import (
 
 var opsAuditSequence uint64
 
+// opsAuditCap bounds the in-memory ops audit log so a long-running service
+// does not accumulate events without limit. The most recent events are kept.
+const opsAuditCap = 1000
+
 func newOpsAuditID() string { return fmt.Sprintf("evt-%06d", atomic.AddUint64(&opsAuditSequence, 1)) }
 
 type OpsAudit struct {
@@ -22,6 +26,9 @@ func (a *OpsAudit) Add(recordID, typ, actor string) OpsEvent {
 	defer a.mu.Unlock()
 	event := OpsEvent{ID: newOpsAuditID(), RecordID: recordID, Type: typ, Actor: actor, At: time.Now().UTC().Format(time.RFC3339Nano)}
 	a.events = append(a.events, event)
+	if len(a.events) > opsAuditCap {
+		a.events = append(a.events[:0:0], a.events[len(a.events)-opsAuditCap:]...)
+	}
 	return event
 }
 func (a *OpsAudit) For(recordID string) []OpsEvent {

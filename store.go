@@ -39,7 +39,13 @@ func (s *SampleStore) List() []Sample {
 	return result
 }
 
+// UpdateStatus atomically moves the sample identified by id to status.
+// The existence check, transition validation, and write are all performed under
+// the write lock so that two concurrent operators who both read the same old
+// status cannot both pass validation and overwrite each other's result.
 func (s *SampleStore) UpdateStatus(id, status string) (Sample, bool, bool) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
 	sample, exists := s.samples[id]
 	if !exists {
 		return Sample{}, false, false
@@ -47,8 +53,6 @@ func (s *SampleStore) UpdateStatus(id, status string) (Sample, bool, bool) {
 	if !sampleTransitions[sample.Status][status] {
 		return sample, true, false
 	}
-	s.mu.Lock()
-	defer s.mu.Unlock()
 	sample.Status = status
 	s.samples[id] = sample
 	return sample, true, true

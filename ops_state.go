@@ -12,6 +12,10 @@ var opsTransitionTable = map[OpsStatus]map[OpsStatus]bool{
 	OpsStatusClosed: {},
 }
 
+// opsHistoryCap bounds the in-memory transition history so a long-running
+// service does not accumulate transitions without limit.
+const opsHistoryCap = 1000
+
 type OpsTransition struct {
 	From   OpsStatus
 	To     OpsStatus
@@ -38,6 +42,9 @@ func (m *OpsStateMachine) Move(from, to OpsStatus, reason string) error {
 		return fmt.Errorf("%w: %s to %s", ErrOpsTransition, from, to)
 	}
 	m.history = append(m.history, OpsTransition{From: from, To: to, Reason: reason})
+	if len(m.history) > opsHistoryCap {
+		m.history = append(m.history[:0:0], m.history[len(m.history)-opsHistoryCap:]...)
+	}
 	return nil
 }
 func (m *OpsStateMachine) History() []OpsTransition {

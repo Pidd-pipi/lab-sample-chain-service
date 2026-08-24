@@ -44,11 +44,11 @@ func serveHTTP(server *http.Server, shutdownTimeout time.Duration) error {
 		}
 		return err
 	case <-signals:
-		return gracefulShutdown(server, shutdownTimeout)
+		return shutdownWithTimeout(server, shutdownTimeout)
 	}
 }
 
-func gracefulShutdown(server *http.Server, timeout time.Duration) error {
+func shutdownWithTimeout(server *http.Server, timeout time.Duration) error {
 	ctx, cancel := context.WithTimeout(context.Background(), timeout)
 	defer cancel()
 	return server.Shutdown(ctx)
